@@ -1,4 +1,5 @@
 streamlit
 feedparser
 python-dotenv
-google-adk
+google-adk==0.1.0
+deprecated
