@@ -32,7 +32,7 @@ DEFAULT_FEED_URLS = [
 # Set a limit on the total number of items processed from feeds to prevent excessive processing time
 MAX_ITEMS_TO_PROCESS = 200 # Adjust as needed
 # Define the Gemini model and unique identifiers for the ADK application and user session
-MODEL_GEMINI = "gemini-2.0-flash" # Specify the LLM for the agent
+MODEL_GEMINI = "gemini-1.5-flash-latest" # Specify the LLM for the agent
 APP_NAME_FOR_ADK = "news_agent_final_mem_v2" # Unique name for this ADK application runner
 USER_ID = "streamlit_user_sf_final_mem_v2" # Unique ID representing the user in this Streamlit app
 print("✅ Imports and Configuration Loaded.")
@@ -127,20 +127,16 @@ def fetch_and_return_news(tool_context: ToolContext, target_date_str: Optional[s
             # If the server responds with HTTP 304, feedparser indicates this via feed.status.
             print(f"--- Tool: Parsing '{url}' - Using cached (ETag: {etag}, Modified: {modified}) ---")
             feed = feedparser.parse(url, etag=etag, modified=modified)
-            print(f"--- DEBUG: feed type = {type(feed)} ---")
-            print(f"--- DEBUG: feed keys = {list(feed.keys())} ---")
-            print(f"--- DEBUG: feed = {feed} ---")
-            status = getattr(feed, 'status', None)
             # --- Handle Feedparser Response Status ---
-            if status == 304: # HTTP 304 Not Modified
+            if feed.status == 304: # HTTP 304 Not Modified
                 # Feed content hasn't changed since last fetch. Reuse items stored in our state cache.
                 cached_feed_items = [item for item in fetch_state.get('items', []) if item.get('source_feed') == url]
                 all_fetched_or_cached_items.extend(cached_feed_items)
                 item_fetch_count += len(cached_feed_items) # Count these towards the limit
                 print(f"--- Tool: Feed '{url}' returned 304 Not Modified. Reusing {len(cached_feed_items)} cached items from state. ---")
                 continue # Skip processing entries for this feed, move to the next URL
-            elif isinstance(status, int) and status >= 400: # Handle HTTP errors (e.g., 404 Not Found, 500 Server Error)
-                err = f"Failed to fetch '{url}', server responded with HTTP status: {status}"
+            elif feed.status >= 400: # Handle HTTP errors (e.g., 404 Not Found, 500 Server Error)
+                err = f"Failed to fetch '{url}', server responded with HTTP status: {feed.status}"
                 errors.append(err)
                 print(f"--- Tool: ERROR fetching feed - {err} ---")
                 continue # Move to the next feed URL
@@ -151,7 +147,7 @@ def fetch_and_return_news(tool_context: ToolContext, target_date_str: Optional[s
                 # Continue processing entries even if bozo is set, as some data might still be valid
             # --- Process Feed Entries ---
             if feed.entries:
-                print(f"--- Tool: Feed '{url}' fetched successfully (Status: {status}). Processing {len(feed.entries)} entries. ---")
+                print(f"--- Tool: Feed '{url}' fetched successfully (Status: {feed.status}). Processing {len(feed.entries)} entries. ---")
                 # Prepare to store new ETag/Modified data if the server provided them
                 url_cache_update = {}
                 if hasattr(feed, 'etag') and feed.etag:
@@ -220,7 +216,7 @@ def fetch_and_return_news(tool_context: ToolContext, target_date_str: Optional[s
                         item_fetch_count += 1 # Increment item counter
             else:
                  # Log if a feed was fetched successfully but contained no entries
-                 print(f"--- Tool: No entries found in fetched feed '{url}' (Status: {status}). ---")
+                 print(f"--- Tool: No entries found in fetched feed '{url}' (Status: {feed.status}). ---")
         except Exception as e:
             # Catch any other unexpected errors during the processing of a single feed
             error_msg = f"Unexpected error processing feed '{url}': {e}"
@@ -303,8 +299,6 @@ def fetch_and_return_news(tool_context: ToolContext, target_date_str: Optional[s
         msg = "I looked for news for the requested period, but couldn't find any items from BBC or NPR in the feeds. You could try 'today', 'yesterday', or a different recent date (YYYY-MM-DD)."
         return {"status": "error", "message": msg}
 print("✅ Tool 'fetch_and_return_news' defined.")
-
-# --------------------------------------------------------------------------
 # ADK Agent Definition (Instructions emphasize state usage for follow-ups)
 # --------------------------------------------------------------------------
 root_agent = Agent(
@@ -357,7 +351,6 @@ root_agent = Agent(
     ]
 )
 print("✅ ADK Agent 'root_agent' defined.")
-
 # --------------------------------------------------------------------------
 # ADK Initialization and Runner Helper Functions
 # --------------------------------------------------------------------------
@@ -611,8 +604,9 @@ st.sidebar.header("Agent Details")
 st.sidebar.caption(f"**Agent Name:** `{APP_NAME_FOR_ADK}`")
 st.sidebar.caption(f"**User ID:** `{USER_ID}`")
 # Display the active ADK session ID (retrieve safely from st.session_state)
-print(f"----------- ADK Session ID: {st.session_state.get('adk_session_id_final_mem_v2', 'N/A')} ---")
-# st.sidebar.caption(f"**Session ID:** `{st.session_state.get('streamlit_session_final_mem_v2_1749650406_34dbb9c9', 'N/A')}`")
+print(f"Current ADK Session ID: {current_session_id}") # For debugging
+# st.sidebar.caption(f"**Session ID:** `{st.session_state.get(adk_session_key, 'N/A')}`")
+
 st.sidebar.caption(f"**LLM Model:** `{MODEL_GEMINI}`")
 st.sidebar.caption("Powered by Google Agent Development Kit.")
 # Optional: Display raw state for debugging
