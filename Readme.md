@@ -113,7 +113,6 @@ ADK_NEWS_AGENT/
 ├── .env                # Environment variables (you create this)
 ├── .gitignore          # Git ignore file
 ├── README.md           # This file
-└── check.py            # Simple RSS feed testing script (optional)
 ```
 
 ## 🔧 Configuration
